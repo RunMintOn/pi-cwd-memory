@@ -1,0 +1,16 @@
+{
+  "name": "pi-memory",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "keywords": ["pi-package"],
+  "pi": {
+    "extensions": ["./index.ts"]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types --test memory.test.ts"
+  }
+}
