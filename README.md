@@ -16,6 +16,12 @@ pi -e npm:@runminton/pi-cwd-memory
 pi -e ./index.ts
 ```
 
+需要持久启用时，也可以直接装本地目录（本项目不会自动修改 pi 配置）：
+
+```bash
+pi install /绝对路径/pi-cwd-memory
+```
+
 ## 安装后它对你的 pi 做了什么
 
 会改变的就这三件事：
@@ -43,13 +49,13 @@ pi -e ./index.ts
 pi remove npm:@runminton/pi-cwd-memory
 ```
 
-卸载后 pi 立即恢复原本的系统提示词，记忆文件**不会**被自动删除。如果你想连记忆一起清理（先确认路径）：
+卸载并重启 pi 后系统提示词恢复原样，记忆文件**不会**被自动删除。如果你想连记忆一起清理（先确认路径）：
 
 ```bash
 trash ~/.pi/agent/memory/--Users-ziqian-project--   # 没有 trash 就用 rm -rf
 ```
 
-`pi -e` 试用的包本来就只存在于临时目录，不装即无痕。
+`pi -e` 不写进配置，结束即无痕（npm 源只缓存在 pi 的临时目录）。
 
 ## 存储位置
 
@@ -65,6 +71,7 @@ trash ~/.pi/agent/memory/--Users-ziqian-project--   # 没有 trash 就用 rm -rf
 - 与 session 文件分开存放，删 session 不会删记忆。
 - 目录命名沿用 pi 的 session 规则：去掉绝对路径开头的分隔符，把 `/`、`\`、`:` 换成 `-`，首尾各加 `--`。`/Users/ziqian/project` → `--Users-ziqian-project--`。
 - 记忆就是普通的 Markdown 文件，你可以随时用编辑器直接看、直接改、直接备份。
+- 启动时仅预建目录，不创建空的 `MEMORY.md`，不改动已有文件。
 
 ## 子目录隔离：一个要知道的取舍
 
@@ -79,8 +86,10 @@ trash ~/.pi/agent/memory/--Users-ziqian-project--   # 没有 trash 就用 rm -rf
 
 每次请求注入的内容只有两块：
 
-1. `memory-prompt.md` 全文（约 2 KB，几百 token）——规则说明，大小固定。
-2. `MEMORY.md` 全文——==索引越大，每次请求的固定开销越大==。建议保持"一条记忆一行"，控制条目数量。
+1. `memory` 段：`memory-prompt.md` 全文（约 2 KB，几百 token），其中 `{{MEMORY_DIR}}` 已替换为绝对记忆目录路径，结尾带路径分隔符。除路径替换和工具名调整外，其余文字保留参考原文。
+2. `memory_index` 段：`Contents of <绝对索引路径> (user's auto-memory, persists across conversations):` 加 `MEMORY.md` 全文——==索引越大，每次请求的固定开销越大==。建议保持"一条记忆一行"，控制条目数量。索引不存在或为空时不注入这一段。
+
+这两段只写进系统提示词，**不追加任何聊天消息**，也**不改磁盘上的索引**。
 
 关于 prompt 缓存：快照在 `session_start` 时确定，`before_agent_start` 每次都复用同一份，不读磁盘。所以**会话内系统提示词前缀不会因为记忆文件被改动而变**，不会在会话中途打断缓存命中。新会话会重新读取，索引变了新会话的前缀自然不同——这是预期行为，不影响已有会话。
 
@@ -96,17 +105,19 @@ trash ~/.pi/agent/memory/--Users-ziqian-project--   # 没有 trash 就用 rm -rf
 
 记忆是某个时间点的观察，不是当前状态。所以读取旧记忆时会被提醒核实：
 
-- 按文件 mtime 算完整天数，满 48 小时起，在读取结果的**第一段文本前**插入 `<system-reminder>This memory is N days old. ...</system-reminder>`。
+- 只处理**当前记忆目录内**文件的成功 `read` 结果；其他路径、失败读取一律不动。
+- 按文件 mtime 算完整天数，满 48 小时起，在读取结果的**第一段文本前**插入 `<system-reminder>This memory is N days old. ...</system-reminder>`，提醒核实当前状态。
 - 同时更新文本形式的 `structuredContent`，所以在 codemode 里嵌套调用 `read` 也能收到提醒。
 - 手动读 `MEMORY.md` 同样生效；会话初始化时直接加载索引不经过工具，因此不附加提醒。
 - 无法获取 mtime 时保留原始读取结果——提醒永远不会把一次成功的读取变成失败。
+- 不修改文件、不修改历史消息、不修改系统快照；也不实现自动召回。
 
 ## 已知限制
 
 - **没有文件锁**：同一启动目录下并行开多个会话时，它们共享同一批文件，同时写入可能互相覆盖。单会话使用没有这个问题。
 - **索引无截断**：`MEMORY.md` 会全量注入，没有大小上限或自动裁剪，索引膨胀会直接推高每次请求的固定开销。
 - 只对 `read` 工具的结果加提醒；用 `bash cat` 之类方式读记忆不会触发。
-- 旧版哈希命名的记忆目录不会自动迁移，需要你手动搬到新的可读目录。
+- 旧版哈希命名的记忆目录既不会自动迁移、也不会自动删除，需要你手动搬到新的可读目录，然后重新进入会话或执行 `/reload` 才会生效。
 - 依赖 `session_start`、`before_agent_start`、`tool_result` 三个钩子，跟随当前 pi 版本开发，未在旧版本上验证。
 
 ## 验证
