@@ -1,4 +1,4 @@
-# pi-memory
+# pi-cwd-memory
 
 按启动目录隔离的文件式记忆扩展。插件准备目录、注入上下文，并为读取旧记忆附加时效提醒。不注册工具，不负责保存、整理或修改记忆。
 
@@ -56,4 +56,10 @@ pi -e ./index.ts
 
 ```bash
 npm test
+```
+
+## 安装
+
+```bash
+pi install npm:@runminton/pi-cwd-memory
 ```
