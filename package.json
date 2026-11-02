@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "description": "Per-cwd file memory for pi: each startup directory gets its own memory index",
   "license": "MIT",
+  "author": "RunMintOn",
+  "engines": {
+    "node": ">=22.19.0"
+  },
   "type": "module",
   "keywords": ["pi-package"],
   "publishConfig": {
@@ -11,7 +15,8 @@
   "files": [
     "index.ts",
     "memory.ts",
-    "memory-prompt.md"
+    "memory-prompt.md",
+    "CHANGELOG.md"
   ],
   "homepage": "https://github.com/RunMintOn/pi-cwd-memory#readme",
   "repository": {

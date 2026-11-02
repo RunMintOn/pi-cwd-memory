@@ -8,6 +8,12 @@
 pi install npm:@runminton/pi-cwd-memory
 ```
 
+也可以用 git 源（钉在 tag 上）：
+
+```bash
+pi install git:github.com/RunMintOn/pi-cwd-memory@v0.1.0
+```
+
 只想试一次，不写进配置：
 
 ```bash
@@ -127,6 +133,8 @@ trash ~/.pi/agent/memory/--Users-ziqian-project--   # 没有 trash 就用 rm -rf
 ```bash
 npm test
 ```
+
+在 pi 1.5.0 上开发并验证。
 
 ## License
 
