@@ -7,7 +7,7 @@ import type { ExtensionAPI, ToolResultEvent, ToolResultEventResult } from "@eare
 import { registerMemoryHooks } from "./memory.ts";
 
 async function fixture(t: TestContext) {
-  const root = await mkdtemp(join(tmpdir(), "pi-memory-test-"));
+  const root = await mkdtemp(join(tmpdir(), "pi-cwd-memory-test-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   return { agentDir: join(root, "agent"), cwd: join(root, "project") };
 }
