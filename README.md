@@ -1,67 +1,120 @@
 # pi-cwd-memory
 
-按启动目录隔离的文件式记忆扩展。插件准备目录、注入上下文，并为读取旧记忆附加时效提醒。不注册工具，不负责保存、整理或修改记忆。
+给 pi 用的文件式长期记忆，**按启动目录隔离**：从 `~/a` 启动只看到 `~/a` 的记忆，从 `~/b` 启动只看到 `~/b` 的记忆。
 
-## 加载
-
-在本目录运行：
-
-```bash
-pi -e ./index.ts
-```
-
-需要持久启用时，可自行执行 `pi install /绝对路径/29-pi-memory`。本项目不会自动修改 pi 配置。
-
-## 存储
-
-默认位置：
-
-```text
-~/.pi/agent/memory/<启动目录的可读路径编码>/
-├── MEMORY.md
-└── 各条记忆.md
-```
-
-使用 pi 的 `getAgentDir()`，因此也遵循 `PI_CODING_AGENT_DIR` 设置。记忆不放入项目工作区，也不与 session 文件混放。不同启动目录（包括同一仓库内的子目录）独立存储。
-
-目录命名沿用 pi 的 session 规则：移除绝对路径开头的分隔符，将 `/`、`\`、`:` 替换为 `-`，首尾各加 `--`。例如 `/Users/ziqian/project` 对应 `--Users-ziqian-project--`。
-
-旧版哈希目录不会自动迁移或删除；如已有记忆，需手动移到新目录后重新进入会话或执行 `/reload`。
-
-启动时仅预建目录，不创建空的 `MEMORY.md`。
-
-## 上下文与缓存
-
-- `session_start`：读取 `memory-prompt.md`，将 `{{MEMORY_DIR}}` 替换为绝对记忆目录；读取完整的 `MEMORY.md`，加上 `Contents of <绝对索引路径> (user's auto-memory, persists across conversations):` 来源说明后生成快照。索引不存在或为空则不加载，不修改磁盘上的索引。
-- `before_agent_start`：将同一份快照设置到系统提示词的 `memory` 和 `memory_index` 分区，不读取磁盘，不追加聊天消息。
-- 会话内即使修改索引、记忆正文或提示词文件，插件也不刷新快照。重新进入会话或执行 `/reload` 才重新读取。
-- 只预载索引，不预载各条记忆正文。正文由 Agent 使用现有工具按需读取。
-- 插件不因记忆文件变化而改变提示词前缀；pi 自身的压缩、工具切换等行为不由本插件控制。
-
-`memory-prompt.md` 使用 `{{MEMORY_DIR}}` 路径占位符，并将工具名称调整为 `write` / `apply_patch`，兼容两种 pi 工具配置。其余文字保留参考原文，不注册额外工具。
-
-不注入 `node_type`、`originSessionId` 或 `modified` 元数据。
-
-## 旧记忆读取提醒
-
-- 使用 `tool_result` 钩子，仅处理当前记忆目录内文件的成功 `read` 结果。
-- 根据文件最后修改时间（mtime）计算完整天数；满 48 小时起，在原读取文本前添加 `<system-reminder>This memory is N days old. ...</system-reminder>`，提醒核实当前状态。
-- 同步更新文本形式的 `structuredContent`，使 codemode 中的嵌套 `read` 也能收到提醒。
-- 手动读取 `MEMORY.md` 也适用；初始化时直接加载索引不经过工具，不附加年龄提醒。
-- 不修改文件、历史消息或系统快照；无法获取 mtime 时保留原读取结果。不实现自动召回。
-
-## 验证
-
-需要 Node.js 22.19 或更新版本，无需安装依赖即可运行：
-
-```bash
-npm test
-```
-
-## 安装
+作者本人把它作为日常使用的记忆方案。它是一个纯本地、无网络的扩展：准备目录、注入上下文、给旧记忆加时效提醒，别的事一律不做。
 
 ```bash
 pi install npm:@runminton/pi-cwd-memory
+```
+
+只想试一次，不写进配置：
+
+```bash
+pi -e npm:@runminton/pi-cwd-memory
+# 本地目录也行
+pi -e ./index.ts
+```
+
+## 安装后它对你的 pi 做了什么
+
+会改变的就这三件事：
+
+| 时机 | 行为 | 影响 |
+|---|---|---|
+| 会话开始 | 建记忆目录（`mkdir -p`），读 `memory-prompt.md` 和 `MEMORY.md` 生成本次会话的快照 | 磁盘上多一个目录 |
+| 每次给模型发请求前 | 把快照写进系统提示词的两段：`memory` 和 `memory_index` | ==会替换 pi 内置的 `memory` 段==，两者是替代关系而非叠加 |
+| 你读取记忆文件时 | 若文件超过 48 小时，在读取结果前加一句时效提醒 | 只改这一次工具返回值，不改文件、不改历史消息 |
+
+明确**不会**做的事：
+
+- 不注册任何工具、命令或快捷键
+- 不安装第二份 `@earendil-works/pi-coding-agent`（声明为 peer dependency，由宿主提供）
+- 不修改 `settings.json`、`.pi/settings.json` 或任何 pi 配置
+- 不写你的项目文件，不碰 git，不创建 `.pi` 目录
+- 不联网，不上传任何内容，记忆只存在本机
+- 不自动保存、不自动整理、不自动召回——存什么、改什么由模型按 `memory-prompt.md` 的规则自己决定
+- 不创建空的 `MEMORY.md`（没有记忆就什么都不注入）
+- 不迁移、不删除你已有的旧记忆目录
+
+## 卸载
+
+```bash
+pi remove npm:@runminton/pi-cwd-memory
+```
+
+卸载后 pi 立即恢复原本的系统提示词，记忆文件**不会**被自动删除。如果你想连记忆一起清理（先确认路径）：
+
+```bash
+trash ~/.pi/agent/memory/--Users-ziqian-project--   # 没有 trash 就用 rm -rf
+```
+
+`pi -e` 试用的包本来就只存在于临时目录，不装即无痕。
+
+## 存储位置
+
+```text
+~/.pi/agent/memory/<启动目录的可读路径编码>/
+├── MEMORY.md      # 索引，每次会话注入
+└── 各条记忆.md     # 正文，按需读取
+```
+
+目录在 `getAgentDir()` 下，因此遵循 `PI_CODING_AGENT_DIR`。
+
+- ==记忆不放进项目工作区==，不会被 `git status` 看到，也不会误提交或误上传。
+- 与 session 文件分开存放，删 session 不会删记忆。
+- 目录命名沿用 pi 的 session 规则：去掉绝对路径开头的分隔符，把 `/`、`\`、`:` 换成 `-`，首尾各加 `--`。`/Users/ziqian/project` → `--Users-ziqian-project--`。
+- 记忆就是普通的 Markdown 文件，你可以随时用编辑器直接看、直接改、直接备份。
+
+## 子目录隔离：一个要知道的取舍
+
+隔离键是**启动目录的绝对路径**，不是 git 仓库根。所以：
+
+- 今天在 `~/repo` 启动、明天在 `~/repo/src` 启动，你会看到两套互不相通的记忆。
+- 想共用一套，就固定从同一个目录启动（通常建议从项目根）。
+
+这么设计是为了"不同项目绝不串味"，代价是同一仓库内换目录会分裂记忆。如果你希望按 git 仓库聚合，需要改成向上查找 `.git`，这属于行为变更，本包不做。
+
+## 上下文、token 与缓存
+
+每次请求注入的内容只有两块：
+
+1. `memory-prompt.md` 全文（约 2 KB，几百 token）——规则说明，大小固定。
+2. `MEMORY.md` 全文——==索引越大，每次请求的固定开销越大==。建议保持"一条记忆一行"，控制条目数量。
+
+关于 prompt 缓存：快照在 `session_start` 时确定，`before_agent_start` 每次都复用同一份，不读磁盘。所以**会话内系统提示词前缀不会因为记忆文件被改动而变**，不会在会话中途打断缓存命中。新会话会重新读取，索引变了新会话的前缀自然不同——这是预期行为，不影响已有会话。
+
+其余细节：
+
+- 只预载索引，不预载各条记忆正文；正文由模型用现有工具按需读取。
+- 会话内修改索引、记忆正文或 `memory-prompt.md` 都不刷新快照。重新进入会话或 `/reload` 才生效。
+- pi 自身的压缩、工具切换引起的上下文变化不由本插件控制。
+- `memory-prompt.md` 用 `{{MEMORY_DIR}}` 占位符注入绝对路径，并把工具名改成 `write` / `apply_patch`，兼容两种 pi 工具配置。
+- 不注入 `node_type`、`originSessionId`、`modified` 等元数据。
+
+## 旧记忆的时效提醒
+
+记忆是某个时间点的观察，不是当前状态。所以读取旧记忆时会被提醒核实：
+
+- 按文件 mtime 算完整天数，满 48 小时起，在读取结果的**第一段文本前**插入 `<system-reminder>This memory is N days old. ...</system-reminder>`。
+- 同时更新文本形式的 `structuredContent`，所以在 codemode 里嵌套调用 `read` 也能收到提醒。
+- 手动读 `MEMORY.md` 同样生效；会话初始化时直接加载索引不经过工具，因此不附加提醒。
+- 无法获取 mtime 时保留原始读取结果——提醒永远不会把一次成功的读取变成失败。
+
+## 已知限制
+
+- **没有文件锁**：同一启动目录下并行开多个会话时，它们共享同一批文件，同时写入可能互相覆盖。单会话使用没有这个问题。
+- **索引无截断**：`MEMORY.md` 会全量注入，没有大小上限或自动裁剪，索引膨胀会直接推高每次请求的固定开销。
+- 只对 `read` 工具的结果加提醒；用 `bash cat` 之类方式读记忆不会触发。
+- 旧版哈希命名的记忆目录不会自动迁移，需要你手动搬到新的可读目录。
+- 依赖 `session_start`、`before_agent_start`、`tool_result` 三个钩子，跟随当前 pi 版本开发，未在旧版本上验证。
+
+## 验证
+
+需要 Node.js 22.19 或更新版本，无需安装依赖：
+
+```bash
+npm test
 ```
 
 ## License
