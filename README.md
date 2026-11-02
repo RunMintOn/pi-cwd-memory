@@ -63,3 +63,7 @@ npm test
 ```bash
 pi install npm:@runminton/pi-cwd-memory
 ```
+
+## License
+
+MIT

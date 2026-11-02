@@ -2,6 +2,7 @@
   "name": "@runminton/pi-cwd-memory",
   "version": "0.1.0",
   "description": "Per-cwd file memory for pi: each startup directory gets its own memory index",
+  "license": "MIT",
   "type": "module",
   "keywords": ["pi-package"],
   "publishConfig": {
