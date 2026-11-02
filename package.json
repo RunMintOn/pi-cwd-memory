@@ -1,7 +1,7 @@
 {
   "name": "@runminton/pi-cwd-memory",
-  "version": "0.1.0",
-  "description": "Per-cwd file memory for pi: each startup directory gets its own memory index",
+  "version": "0.1.1",
+  "description": "Minimal and reliable memory for pi that gives the agent plain Markdown files and stays out of the way, in about 90 lines of code.",
   "license": "MIT",
   "author": "RunMintOn",
   "engines": {
